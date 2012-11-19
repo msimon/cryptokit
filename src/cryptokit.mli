@@ -23,7 +23,7 @@
     - Random number generation.
     - Encodings and compression: base 64, hexadecimal, Zlib compression.
 
-    To use this library, link with 
+    To use this library, link with
       [ocamlc unix.cma nums.cma cryptokit.cma]
     or
       [ocamlopt unix.cmxa nums.cmxa cryptokit.cmxa].
@@ -69,7 +69,7 @@ class type transform =
     method flush: unit
       (** [flush] causes the transform to flush its internal buffers
           and make all output processed up to this point available through
-          the [get_*] methods.  
+          the [get_*] methods.
           Raise [Error Wrong_data_length] if the total length
           of input data provided via the [put_*] methods is not
           an integral number of the input block size
@@ -151,7 +151,7 @@ val transform_channel:
       is provided, exactly [len] characters are read from [ic] and
       transformed; [End_of_file] is raised if [ic] does not contain
       at least [len] characters.  If [len] is not provided, [ic] is
-      read all the way to end of file. 
+      read all the way to end of file.
       The transform [t] is wiped before returning, hence can
       no longer be used for further transformations. *)
 
@@ -193,7 +193,7 @@ class type hash =
 
 val hash_string: hash -> string -> string
   (** [hash_string h s] runs the string [s] through the hash function [h]
-      and returns the hash value of [s].  
+      and returns the hash value of [s].
       The hash [h] is wiped before returning, hence can
       no longer be used for further hash computations. *)
 val hash_channel: hash -> ?len:int -> in_channel -> string
@@ -202,7 +202,7 @@ val hash_channel: hash -> ?len:int -> in_channel -> string
       If the optional [len] argument is provided, exactly [len] characters
       are read from [ic] and hashed; [End_of_file] is raised if [ic]
       does not contain at least [len] characters.
-      If [len] is not provided, [ic] is read all the way to end of file.      
+      If [len] is not provided, [ic] is read all the way to end of file.
       The hash [h] is wiped before returning, hence can
       no longer be used for further hash computations. *)
 
@@ -280,7 +280,7 @@ module Random : sig
         generator that can generate arbitrarily long strings of pseudo-random
         data without delays, and with a total entropy of approximately
         160 bits. *)
-end        
+end
 
 (** The [Padding] module defines a generic interface
     for padding input data to an integral number of blocks,
@@ -462,10 +462,29 @@ module Cipher : sig
 
         The [blowfish] function returns a transform that performs encryption
         or decryption, depending on the direction argument. *)
+
+  module Helper : sig
+
+    val encrypt_helper :
+      ?data_type:[< `Hexa | `Raw > `Hexa ] ->
+      ?iv:string ->
+      ?pad:Padding.scheme ->
+      ?mode:chaining_mode ->
+      ?algo:[< `AES | `ARC4 | `BlowFish | `DES | `T_DES > `AES ] ->
+      key:string -> string -> string
+
+    val decrypt_helper :
+      ?data_type:[< `Hexa | `Raw > `Hexa ] ->
+      ?pad:Padding.scheme ->
+      ?mode:chaining_mode ->
+      ?algo:[< `AES | `ARC4 | `BlowFish | `DES | `T_DES > `AES ] ->
+      key:string -> string -> string
+
+  end
 end
 
 (** The [Hash] module implements unkeyed cryptographic hashes (SHA-1,
-    SHA-256, RIPEMD-160 and MD5), also known as message digest functions.  
+    SHA-256, RIPEMD-160 and MD5), also known as message digest functions.
     Hash functions used in cryptography are characterized as being
     <I>one-way</I> (given a hash value, it is computationally
     infeasible to find a text that hashes to this value) and
@@ -660,7 +679,7 @@ end
   by exchanging messages, with the guarantee that even if an attacker
   eavesdrop on the messages, he cannot recover the shared secret.
   Diffie-Hellman is one such key agreement protocol, relying on
-  the difficulty of computing discrete logarithms.  Notice that 
+  the difficulty of computing discrete logarithms.  Notice that
   the Diffie-Hellman protocol is vulnerable to active attacks
   (man-in-the-middle attacks).
 
@@ -704,7 +723,7 @@ module DH: sig
   type private_secret
     (** The abstract type of private secrets generated during key agreement. *)
   val private_secret: ?rng: Random.rng -> parameters -> private_secret
-    (** Generate a random private secret.  
+    (** Generate a random private secret.
       The optional [rng] argument specifies a random number generator
       to use; it defaults to {!Cryptokit.Random.secure_rng}. *)
   val message: parameters -> private_secret -> string
@@ -729,7 +748,7 @@ module DH: sig
       counter until [numbytes] bytes have been obtained. *)
 end
 
-(** {6 Advanced, compositional interface to block ciphers 
+(** {6 Advanced, compositional interface to block ciphers
        and stream ciphers} *)
 
 (** The [Block] module provides classes that implements
@@ -834,7 +853,7 @@ module Block : sig
         underlying block cipher. *)
   class cbc_decrypt: ?iv: string -> block_cipher -> block_cipher
     (** Add Cipher Block Chaining (CBC) to the given block cipher
-        in decryption mode.  This works like {!Cryptokit.Block.cbc_encrypt}, 
+        in decryption mode.  This works like {!Cryptokit.Block.cbc_encrypt},
         except that input blocks are first decrypted by the block
         cipher before being xor-ed with the previous input block. *)
 
@@ -851,7 +870,7 @@ module Block : sig
     (** Add Output Feedback Block (OFB) to the given block cipher.
         The integer argument [n] is the number of
         bytes processed at a time; it must lie between [1] and
-        the block size of the underlying cipher, included.        
+        the block size of the underlying cipher, included.
         The returned block cipher has block size [n].
         It is usable both for encryption and decryption. *)
 end
@@ -898,7 +917,7 @@ module Base64: sig
     (** Return a transform that performs base 64 encoding.
         The output is divided in lines of length 76 characters,
         and final [=] characters are used to pad the output,
-        as specified in the MIME standard. 
+        as specified in the MIME standard.
         The output is approximately [4/3] longer than the input. *)
   val encode_compact : unit -> transform
     (** Same as {!Cryptokit.Base64.encode_multiline}, but the output is not
