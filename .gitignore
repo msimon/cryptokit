@@ -11,3 +11,6 @@ _build
 *.cmx
 *.cmxs
 *.cmxa
+*.byte
+*.native
+*.log

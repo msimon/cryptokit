@@ -306,6 +306,9 @@ object(self)
     wipe_string obuf
 end
 
+
+(* Random number generation *)
+
 (* Block ciphers *)
 
 module Block = struct
@@ -498,6 +501,31 @@ module Block = struct
       cipher#wipe;
       wipe_string iv;
       wipe_string next_iv
+  end
+
+  class ctr ?iv:iv_init (cipher : block_cipher) =
+    let blocksize = cipher#blocksize in
+  object(self)
+    val iv = make_initial_iv blocksize iv_init
+    method blocksize = blocksize
+    method transform src src_off dst dst_off =
+      cipher#transform iv 0 dst dst_off;
+      xor_string src src_off dst dst_off blocksize;
+      let rec next_iv n =
+        if n < 0 then ()
+        else begin
+          let c = Char.code (String.get iv n) in
+          if c = 255 then begin
+            String.set iv n '\000';
+            next_iv (n - 1)
+          end else
+            String.set iv n (Char.chr (c + 1))
+        end
+      in
+      next_iv (blocksize - 1);
+    method wipe =
+      cipher#wipe;
+      wipe_string iv
   end
 
   class cfb_encrypt ?iv:iv_init chunksize (cipher : block_cipher) =
@@ -906,96 +934,6 @@ module Hash = struct
 end
 
 
-(* Hexadecimal encoding *)
-
-module Hexa = struct
-
-  let hex_conv_table = "0123456789abcdef"
-
-  class encode =
-  object (self)
-    method input_block_size = 1
-    method output_block_size = 1
-
-    inherit buffered_output 256 as output_buffer
-
-    method put_byte b =
-      self#ensure_capacity 2;
-      obuf.[oend] <- hex_conv_table.[b lsr 4];
-      obuf.[oend + 1] <- hex_conv_table.[b land 0xF];
-      oend <- oend + 2
-
-    method put_char c = self#put_byte (Char.code c)
-
-    method put_substring s ofs len =
-      for i = ofs to ofs + len - 1 do self#put_char s.[i] done
-
-    method put_string s =
-      self#put_substring s 0 (String.length s)
-
-    method flush = ()
-    method finish = ()
-
-    method wipe = output_buffer#wipe
-  end
-
-  let encode () = new encode
-
-  let hex_decode_char c =
-    match c with
-      | '0' .. '9' -> Char.code c - 48
-      | 'A' .. 'F' -> Char.code c - 65 + 10
-      | 'a' .. 'f' -> Char.code c - 97 + 10
-      | ' '|'\t'|'\n'|'\r' -> -1
-      | _   -> raise (Error Bad_encoding)
-
-  class decode =
-  object (self)
-    inherit buffered_output 256 as output_buffer
-
-    method input_block_size = 1
-    method output_block_size = 1
-
-    val ibuf = Array.create 2 0
-    val mutable ipos = 0
-
-    method put_char c =
-      let n = hex_decode_char c in
-      if n >= 0 then begin
-        ibuf.(ipos) <- n;
-        ipos <- ipos + 1;
-        if ipos = 2 then begin
-          self#ensure_capacity 1;
-          obuf.[oend]   <- Char.chr(ibuf.(0) lsl 4 lor ibuf.(1));
-          oend <- oend + 1;
-          ipos <- 0
-        end
-      end
-
-    method put_substring s ofs len =
-      for i = ofs to ofs + len - 1 do self#put_char s.[i] done
-
-    method put_string s =
-      self#put_substring s 0 (String.length s)
-
-    method put_byte b = self#put_char (Char.chr b)
-
-    method flush =
-      if ipos <> 0 then raise(Error Wrong_data_length)
-
-    method finish =
-      if ipos <> 0 then raise(Error Bad_encoding)
-
-    method wipe =
-      Array.fill ibuf 0 2 0; output_buffer#wipe
-  end
-
-  let decode () = new decode
-
-end
-
-(* Random number generation *)
-
 module Random = struct
 
   class type rng =
@@ -1149,6 +1087,94 @@ module Random = struct
 
 end
 
+(* Hexadecimal encoding *)
+
+module Hexa = struct
+
+  let hex_conv_table = "0123456789abcdef"
+
+  class encode =
+  object (self)
+    method input_block_size = 1
+    method output_block_size = 1
+
+    inherit buffered_output 256 as output_buffer
+
+    method put_byte b =
+      self#ensure_capacity 2;
+      obuf.[oend] <- hex_conv_table.[b lsr 4];
+      obuf.[oend + 1] <- hex_conv_table.[b land 0xF];
+      oend <- oend + 2
+
+    method put_char c = self#put_byte (Char.code c)
+
+    method put_substring s ofs len =
+      for i = ofs to ofs + len - 1 do self#put_char s.[i] done
+
+    method put_string s =
+      self#put_substring s 0 (String.length s)
+
+    method flush = ()
+    method finish = ()
+
+    method wipe = output_buffer#wipe
+  end
+
+  let encode () = new encode
+
+  let hex_decode_char c =
+    match c with
+      | '0' .. '9' -> Char.code c - 48
+      | 'A' .. 'F' -> Char.code c - 65 + 10
+      | 'a' .. 'f' -> Char.code c - 97 + 10
+      | ' '|'\t'|'\n'|'\r' -> -1
+      | _   -> raise (Error Bad_encoding)
+
+  class decode =
+  object (self)
+    inherit buffered_output 256 as output_buffer
+
+    method input_block_size = 1
+    method output_block_size = 1
+
+    val ibuf = Array.create 2 0
+    val mutable ipos = 0
+
+    method put_char c =
+      let n = hex_decode_char c in
+      if n >= 0 then begin
+        ibuf.(ipos) <- n;
+        ipos <- ipos + 1;
+        if ipos = 2 then begin
+          self#ensure_capacity 1;
+          obuf.[oend]   <- Char.chr(ibuf.(0) lsl 4 lor ibuf.(1));
+          oend <- oend + 1;
+          ipos <- 0
+        end
+      end
+
+    method put_substring s ofs len =
+      for i = ofs to ofs + len - 1 do self#put_char s.[i] done
+
+    method put_string s =
+      self#put_substring s 0 (String.length s)
+
+    method put_byte b = self#put_char (Char.chr b)
+
+    method flush =
+      if ipos <> 0 then raise(Error Wrong_data_length)
+
+    method finish =
+      if ipos <> 0 then raise(Error Bad_encoding)
+
+    method wipe =
+      Array.fill ibuf 0 2 0; output_buffer#wipe
+  end
+
+  let decode () = new decode
+
+end
+
 (* High-level entry points for ciphers *)
 
 module Cipher = struct
@@ -1158,28 +1184,31 @@ module Cipher = struct
   type chaining_mode =
     | ECB
     | CBC
+    | CTR
     | CFB of int
     | OFB of int
 
   let make_block_cipher ?(mode = CBC) ?pad ?iv dir block_cipher =
     let chained_cipher =
       match (mode, dir) with
-          (ECB, _) -> block_cipher
+        | (ECB, _) -> block_cipher
         | (CBC, Encrypt) -> new Block.cbc_encrypt ?iv block_cipher
         | (CBC, Decrypt) -> new Block.cbc_decrypt ?iv block_cipher
+        | (CTR, _) -> new Block.ctr ?iv block_cipher
         | (CFB n, Encrypt) -> new Block.cfb_encrypt ?iv n block_cipher
         | (CFB n, Decrypt) -> new Block.cfb_decrypt ?iv n block_cipher
-        | (OFB n, _) -> new Block.ofb ?iv n block_cipher in
-    match pad with
-        None -> new Block.cipher chained_cipher
-      | Some p ->
+        | (OFB n, _) -> new Block.ofb ?iv n block_cipher
+    in
+    match pad, mode with
+      | None, _ | _, CTR -> new Block.cipher chained_cipher
+      | Some p, _ ->
         match dir with
-            Encrypt -> new Block.cipher_padded_encrypt p chained_cipher
+          | Encrypt -> new Block.cipher_padded_encrypt p chained_cipher
           | Decrypt -> new Block.cipher_padded_decrypt p chained_cipher
 
   let normalize_dir mode dir =
     match mode with
-        Some(CFB _) | Some(OFB _) -> Encrypt
+        Some(CFB _) | Some(OFB _) | Some(CTR) -> Encrypt
       | _ -> dir
 
   let aes ?mode ?pad ?iv key dir =

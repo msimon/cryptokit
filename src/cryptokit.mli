@@ -334,9 +334,10 @@ module Cipher : sig
         (transforming plaintext to ciphertext) or decryption
         (transforming ciphertext to plaintext). *)
 
-  type chaining_mode =
-      ECB
+ type chaining_mode =
+    | ECB
     | CBC
+    | CTR
     | CFB of int
     | OFB of int
     (** Block ciphers such as AES or DES map a fixed-sized block of
@@ -856,6 +857,17 @@ module Block : sig
         in decryption mode.  This works like {!Cryptokit.Block.cbc_encrypt},
         except that input blocks are first decrypted by the block
         cipher before being xor-ed with the previous input block. *)
+
+  class ctr: ?iv: string -> block_cipher -> block_cipher
+  (** Add Couter mode (CTR) to the given block cipher.
+      Each block of input is xor-ed with the iv (incremented by one at each turn)
+      before being encrypted through the given block cipher.
+      The optional [iv] argument specifies the string to be xor-ed
+      with the first input block, and defaults to all zeroes.
+      The returned block cipher has the same block size as the
+      underlying block cipher.
+      It is usable both for encryption and decryption
+  *)
 
   class cfb_encrypt: ?iv: string -> int -> block_cipher -> block_cipher
     (** Add Cipher Feedback Block (CFB) to the given block cipher
